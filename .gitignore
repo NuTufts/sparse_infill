@@ -1,0 +1,6 @@
+*.png
+*.txt
+*.root
+*.tar
+sparse_infill/training/runs
+
