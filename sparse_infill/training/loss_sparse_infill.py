@@ -50,9 +50,10 @@ class SparseInfillLoss(nn.modules.loss._WeightedLoss):
         # want three losses: non-dead, dead w/o charge, dead w/ charge
         L1loss=torch.nn.L1Loss(self.size_average)
         nondeadweight = 1.0
-        deadnochargeweight = 1000.0
+        deadnochargeweight = 500.0
         deadlowchargeweight = 100.0
-        deadhighchargeweight = 1000.0
+        deadhighchargeweight = 100.0
+        deadhighestchargeweight = 100.0
 
         goodch = (input > 0).float()
         predictgood = goodch * predict
@@ -64,7 +65,16 @@ class SparseInfillLoss(nn.modules.loss._WeightedLoss):
 
         deadch = (input.eq(0)).float()
 
-        deadchhighcharge = deadch * (adc > 40).float()
+        deadchhighestcharge = deadch * (adc > 70).float()
+        predictdeadhighestcharge = predict*deadchhighestcharge
+        adcdeadhighestcharge = adc*deadchhighestcharge
+        totdeadhighestcharge = deadchhighestcharge.sum().float()
+        if (totdeadhighestcharge == 0):
+                totdeadhighestcharge = 1.0
+        deadhighestchargeloss = (L1loss(predictdeadhighestcharge,adcdeadhighestcharge)*deadhighestchargeweight)/totdeadhighestcharge
+
+
+        deadchhighcharge = deadch * (adc > 40).float()*(adc < 70).float()
         predictdeadhighcharge = predict*deadchhighcharge
         adcdeadhighcharge = adc*deadchhighcharge
         totdeadhighcharge = deadchhighcharge.sum().float()
@@ -88,5 +98,5 @@ class SparseInfillLoss(nn.modules.loss._WeightedLoss):
                 totdeadnocharge = 1.0
         deadnochargeloss = (L1loss(predictdeadnocharge,adcdeadnocharge)*deadnochargeweight)/totdeadnocharge
 
-        totloss = nondeadloss + deadnochargeloss + deadlowchargeloss +deadhighchargeloss
-        return nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss, totloss
+        totloss = nondeadloss + deadnochargeloss + deadlowchargeloss +deadhighchargeloss+deadhighestchargeloss
+        return nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss,deadhighestchargeloss, totloss

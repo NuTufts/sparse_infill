@@ -134,6 +134,7 @@ class SparseInfillPyTorchDataset(torchdata.Dataset):
         # make tensor for coords (row,col,batch)
         coord_t = torch.zeros( (ncoords,3), dtype=torch.int ).to(device)
 
+
         # tensor for input pixel s
         input_t = torch.zeros( (ncoords,1), dtype=torch.float).to(device)
 

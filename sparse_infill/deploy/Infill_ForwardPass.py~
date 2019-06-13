@@ -1,0 +1,80 @@
+#!/bin/env python
+
+## IMPORT
+
+# python,numpy
+import os,sys,commands
+import shutil
+import time
+import traceback
+import numpy as np
+
+# import larcv
+from larcv import larcv
+
+# torch
+import torch
+import torch.nn as nn
+import torch.nn.parallel
+import torch.backends.cudnn as cudnn
+import torch.distributed as dist
+import torch.optim
+import torch.utils.data
+import torch.utils.data.distributed
+import torchvision.transforms as transforms
+import torchvision.datasets as datasets
+import torchvision.models as models
+import torch.nn.functional as F
+
+sys.path.append("../models")
+from sparseinfill import SparseInfill
+
+def test(a):
+    print a
+    return a
+
+def forwardpass(data_t):
+    # function to load the sparse infill network and run a forward pass of one image
+    # inputs:
+    #     coord_t and input_t : sparse numpy arrays to feed into network
+    #     checkpointfile : string of checkpoint file
+    # output:
+    #     pred_t : sparse numpy array containing netowrk output
+
+    # make tensor for coords (row,col,batch)
+    # ncoords = data_t.size()
+    # print "ncoords: ", ncoords
+    ncoords = 5
+    coord_t = torch.ones( (ncoords,3), dtype=torch.int )
+    # tensor for input pixel s
+    input_t = torch.zeros( (ncoords,1), dtype=torch.float)
+
+    coord_t[0:ncoords,0:2] \
+        = torch.from_numpy(data_t[:,0:2].astype(np.int) )
+    input_t[0:ncoords,0]  = torch.from_numpy(data_t[:,2])
+    print "coord_t:"
+    print coord_t
+    print "input_t:"
+    print input_t
+
+    # loading model with hard coded parameters used in training
+    # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
+    CHECKPOINT_FILE = "../training/yplane_50000_1sr.tar"
+    model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
+    print "loaded model"
+
+    # load checkpoint data
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cuda:0","cuda:1":"cuda:1"} )
+    best_prec1 = checkpoint["best_prec1"]
+    model.load_state_dict(checkpoint["state_dict"])
+
+
+    # run the forward pass
+    out_t = model(coord_t, input_t, 1)
+    print "out_t:"
+    print out_t
+    # predict_t = np.zeros( (ncoords,3))
+    # predict_t[0:ncoords,2]  = (out_t[:,0].data.numpy())
+    # predict_t[0:ncoords,1:2]  = (coord_t.data.np()[:,0:2])
+
+    return out_t.data.numpy()

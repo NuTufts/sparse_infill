@@ -51,9 +51,10 @@ class SparseInfill(nn.Module):
         self.conv2 = scn.SubmanifoldConvolution(self._dimension, self._nin_features, 1, 3, False)
 
     def forward(self,coord_t,input_t,batchsize):
+        if self._show_sizes:
+            print "coord_t ",coord_t.shape
+            print "input_t ",input_t.shape
         x=(coord_t,input_t,batchsize)
-        # if self._show_sizes:
-        #     print "input: ",x.features.shape
         x=self.input(x)
         if self._show_sizes:
             print "inputlayer: ",x.features.shape

@@ -45,16 +45,16 @@ GPUMODE=True
 RESUME_FROM_CHECKPOINT=False
 RUNPROFILER=False
 
-CHECKPOINT_FILE="test_y_5000.tar"
+CHECKPOINT_FILE="vplane_24000.tar"
 INPUTFILE_TRAIN=["/mnt/disk1/nutufts/kmason/data/sparseinfill_data_train.root"]
 INPUTFILE_VALID="/mnt/disk1/nutufts/kmason/data/sparseinfill_data_valid.root"
 TICKBACKWARD=False
-PLANE = 2
+PLANE = 0
 start_iter  = 0
-num_iters   = 15000
+num_iters   = 50000
 IMAGE_WIDTH=496
 IMAGE_HEIGHT=512
-BATCHSIZE_TRAIN=1#20
+BATCHSIZE_TRAIN=2#20
 BATCHSIZE_VALID=1 #10
 NWORKERS_TRAIN=1
 NWORKERS_VALID=1
@@ -146,7 +146,7 @@ def main():
 
     # ADAM
     # betas default: (0.9, 0.999) for (grad, grad^2). smoothing coefficient for grad. magnitude calc.
-    #optimizer = torch.optim.Adam(model.parameters(),
+    # optimizer = torch.optim.Adam(model.parameters(),
     #                             lr=lr,
     #                             weight_decay=weight_decay)
     # RMSPROP
@@ -311,7 +311,8 @@ def train(train_loader, device, batchsize, model, criterion, optimizer, nbatches
                 "nondeadloss",
                 "deadnochargeloss",
                 "deadlowchargeloss",
-                "deadhighchargeloss")
+                "deadhighchargeloss",
+                "deadhighestchargeloss")
 
     loss_meters = {}
     for l in lossnames:
@@ -345,7 +346,7 @@ def train(train_loader, device, batchsize, model, criterion, optimizer, nbatches
 
         predict_t = model(coord_t, input_t,batchsize )
 
-        nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss, totloss = criterion(predict_t, true_t, input_t)
+        nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss, deadhighestchargeloss, totloss = criterion(predict_t, true_t, input_t)
         # print "Loss: ", loss.item()
 
         if RUNPROFILER:
@@ -372,6 +373,7 @@ def train(train_loader, device, batchsize, model, criterion, optimizer, nbatches
         loss_meters["deadnochargeloss"].update( deadnochargeloss.item() )
         loss_meters["deadlowchargeloss"].update( deadlowchargeloss.item() )
         loss_meters["deadhighchargeloss"].update( deadhighchargeloss.item() )
+        loss_meters["deadhighestchargeloss"].update( deadhighestchargeloss.item() )
 
         # measure accuracy and update meters
         acc_values = accuracy(predict_t.detach(),
@@ -436,7 +438,8 @@ def validate(val_loader, device, batchsize, model, criterion, optimizer, nbatche
                 "nondeadloss",
                 "deadnochargeloss",
                 "deadlowchargeloss",
-                "deadhighchargeloss")
+                "deadhighchargeloss",
+                "deadhighestchargeloss")
 
     loss_meters = {}
     for l in lossnames:
@@ -467,7 +470,7 @@ def validate(val_loader, device, batchsize, model, criterion, optimizer, nbatche
         # compute output
         tforward = time.time()
         predict_t = model(coord_t, input_t,batchsize )
-        nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss, totloss = criterion(predict_t, true_t, input_t)
+        nondeadloss, deadnochargeloss, deadlowchargeloss, deadhighchargeloss, deadhighestchargeloss, totloss = criterion(predict_t, true_t, input_t)
 
         time_meters["forward"].update(time.time()-tforward)
 
@@ -478,6 +481,7 @@ def validate(val_loader, device, batchsize, model, criterion, optimizer, nbatche
         loss_meters["deadnochargeloss"].update( deadnochargeloss.item() )
         loss_meters["deadlowchargeloss"].update( deadlowchargeloss.item() )
         loss_meters["deadhighchargeloss"].update( deadhighchargeloss.item() )
+        loss_meters["deadhighestchargeloss"].update( deadhighestchargeloss.item() )
 
 
         # measure accuracy and update meters
@@ -511,9 +515,9 @@ def validate(val_loader, device, batchsize, model, criterion, optimizer, nbatche
 
     return loss_meters['total'].avg,acc_meters['infillacc5'].avg
 
-def save_checkpoint(state, is_best, p, filename='checkpoint2.pth.tar'):
+def save_checkpoint(state, is_best, p, filename='checkpoint.pth.tar'):
     if p>0:
-        filename = "checkpoint2.%dth.tar"%(p)
+        filename = "checkpoint.%dth.tar"%(p)
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'model_best.tar')
