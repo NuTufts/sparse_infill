@@ -8,18 +8,18 @@
 
 #include "numpy/arrayobject.h"
 // larcv
-#include "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/larcv/larcv/core/DataFormat/EventImage2D.h"
-#include "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/larcv/larcv/core/DataFormat/EventChStatus.h"
-#include "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/larcv/larcv/core/DataFormat/EventSparseImage.h"
-#include "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/larcv/larcv/core/DataFormat/ImageMeta.h"
-#include "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/larcv/larcv/core/DataFormat/IOManager.h"
+#include "larcv/core/DataFormat/EventImage2D.h"
+#include "larcv/core/DataFormat/EventChStatus.h"
+#include "larcv/core/DataFormat/EventSparseImage.h"
+#include "larcv/core/DataFormat/ImageMeta.h"
+#include "larcv/core/DataFormat/IOManager.h"
 
 int main(){
   Py_Initialize();
   import_array1(0);
   // input IOManager
   larcv::IOManager *ioin = new larcv::IOManager(larcv::IOManager::kBOTH,"IOManager");
-  ioin->add_in_file( "/mnt/disk1/nutufts/kmason/data/sparseinfill_data_test.root" );
+  ioin->add_in_file( "/cluster/tufts/wongjiradlab/kmason03/data/sparse/sparseinfill_data_test.root" );
   ioin->set_out_file("sparseinfill_cxx_test.root");
   ioin->initialize();
 
@@ -29,7 +29,8 @@ int main(){
   foutIO->initialize();
 
   // loop through entries
-  for (int n = 0; n<ioin->get_n_entries();n++){
+  // n<ioin->get_n_entries()
+  for (int n = 0; n<1;n++){
     ioin->read_entry(n);
     larcv::EventBase *ev_meta  = ioin->get_data(larcv::kProductSparseImage,"ADCMasked");
 

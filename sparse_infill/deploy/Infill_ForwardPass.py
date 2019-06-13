@@ -47,11 +47,11 @@ def forwardpassu(data_t):
 
     # loading model with hard coded parameters used in training
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
-    CHECKPOINT_FILE = "../training/uplane_26000.tar"
+    CHECKPOINT_FILE = "/cluster/tufts/wongjiradlab/larbys/ssnet_models/sparseinfill_uplane_test.tar"
     model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
 
     # load checkpoint data
-    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cuda:0","cuda:1":"cuda:1"} )
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
     best_prec1 = checkpoint["best_prec1"]
     model.load_state_dict(checkpoint["state_dict"])
 
@@ -78,11 +78,11 @@ def forwardpassv(data_t):
 
     # loading model with hard coded parameters used in training
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
-    CHECKPOINT_FILE = "../training/vplane_32000.tar"
+    CHECKPOINT_FILE = "/cluster/tufts/wongjiradlab/larbys/ssnet_models/sparseinfill_vplane_test.tar"
     model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
 
     # load checkpoint data
-    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cuda:0","cuda:1":"cuda:1"} )
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
     best_prec1 = checkpoint["best_prec1"]
     model.load_state_dict(checkpoint["state_dict"])
 
@@ -109,11 +109,11 @@ def forwardpassy(data_t):
 
     # loading model with hard coded parameters used in training
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
-    CHECKPOINT_FILE = "../training/yplane_50000_1st.tar"
+    CHECKPOINT_FILE = "/cluster/tufts/wongjiradlab/larbys/ssnet_models/sparseinfill_yplane_test.tar"
     model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
 
     # load checkpoint data
-    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cuda:0","cuda:1":"cuda:1"} )
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
     best_prec1 = checkpoint["best_prec1"]
     model.load_state_dict(checkpoint["state_dict"])
 
