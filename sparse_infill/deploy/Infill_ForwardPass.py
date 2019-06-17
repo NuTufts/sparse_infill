@@ -36,6 +36,7 @@ def test(a):
 def forwardpassu(data_t):
     # function to load the sparse infill network and run a forward pass of one image
     # make tensor for coords (row,col,batch)
+    # print "forward pass"
     ncoords = np.size(data_t,0)
     coord_t = torch.ones( (ncoords,3), dtype=torch.int )
     # tensor for input pixels
@@ -49,6 +50,7 @@ def forwardpassu(data_t):
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
     CHECKPOINT_FILE = "/cluster/tufts/wongjiradlab/larbys/ssnet_models/sparseinfill_uplane_test.tar"
     model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
+    # print "loaded model"
 
     # load checkpoint data
     checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
@@ -56,11 +58,14 @@ def forwardpassu(data_t):
     model.load_state_dict(checkpoint["state_dict"])
 
     # run the forward pass
-    out_t = model(coord_t, input_t, 1)
+    with torch.set_grad_enabled(False):
+        out_t = model(coord_t, input_t, 1)
     out_t = out_t.data.numpy()
+    input_t = input_t.data.numpy()
     predict_t = np.zeros( (ncoords,3), dtype=np.float32)
     predict_t[:,2]   = out_t[:,0]
     predict_t[:,0:2] = data_t[:,0:2]
+
 
     return predict_t
 
@@ -87,7 +92,8 @@ def forwardpassv(data_t):
     model.load_state_dict(checkpoint["state_dict"])
 
     # run the forward pass
-    out_t = model(coord_t, input_t, 1)
+    with torch.set_grad_enabled(False):
+        out_t = model(coord_t, input_t, 1)
     out_t = out_t.data.numpy()
     predict_t = np.zeros( (ncoords,3), dtype=np.float32)
     predict_t[:,2]   = out_t[:,0]
@@ -106,6 +112,8 @@ def forwardpassy(data_t):
     coord_t[0:ncoords,0:2] \
         = torch.from_numpy(data_t[:,0:2].astype(np.int) )
     input_t[0:ncoords,0]  = torch.from_numpy(data_t[:,2])
+    # print coord_t
+    # print input_t
 
     # loading model with hard coded parameters used in training
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
@@ -118,7 +126,8 @@ def forwardpassy(data_t):
     model.load_state_dict(checkpoint["state_dict"])
 
     # run the forward pass
-    out_t = model(coord_t, input_t, 1)
+    with torch.set_grad_enabled(False):
+        out_t = model(coord_t, input_t, 1)
     out_t = out_t.data.numpy()
     predict_t = np.zeros( (ncoords,3), dtype=np.float32)
     predict_t[:,2]   = out_t[:,0]

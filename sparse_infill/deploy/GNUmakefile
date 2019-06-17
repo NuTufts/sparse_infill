@@ -7,12 +7,12 @@ INCLUDES = `root-config --incdir`
 INCLUDES += `/usr/bin/python2.7-config --includes`
 INCLUDES += `larcv-config --includes`
 INCLUDES += `larlite-config --includes`
-INCLUDES += -I$(UBLARCVAPP_INCDIR)
+INCLUDES += `ublarcvapp-config --includes`
 
 LIBS = `root-config --libs`
 LIBS += `larlite-config --libs`
 LIBS += `larcv-config --libs`
-LIBS += -L$(UBLARCVAPP_LIBDIR)
+LIBS += `ublarcvapp-config --libs` 
 
 LDFLAGS = `root-config --ldflags` -lstdc++
 LDFLAGS += `/usr/bin/python2.7-config --ldflags`
@@ -20,7 +20,7 @@ LDFLAGS += `/usr/bin/python2.7-config --ldflags`
 LDLIBS = `root-config --libs`
 LDLIBS = `/usr/bin/python2.7-config --libs`
 
-EXEC = pytest
+EXEC = pytest sparse_full_deploy
 
 all: $(EXEC)
 %: %.cxx
