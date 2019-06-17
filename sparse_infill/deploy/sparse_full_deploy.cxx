@@ -5,6 +5,7 @@ larcv::Image2D Network(larcv::Image2D Pred_img,larcv::SparseImage img_adcmasked,
   // Convert array into numpy array
   int ND = img_adcmasked.pixellist().size();
   // std::cout <<ND <<std::endl;
+  clock_t startloop = clock();
 
   float npts    = ND/3;
   float c_arr[int(npts)][3];
@@ -20,7 +21,7 @@ larcv::Image2D Network(larcv::Image2D Pred_img,larcv::SparseImage img_adcmasked,
 
   PyObject *pArray = PyArray_SimpleNewFromData(2,dims,NPY_FLOAT,reinterpret_cast<void*>(c_arr));
   // std::cout<<pArray<<std::endl;
-
+  clock_t parray = clock();
   // import forward pass python module
   PyObject *pName = PyUnicode_FromString("Infill_ForwardPass");
   PyObject *pModule = PyImport_Import(pName);
@@ -40,7 +41,9 @@ larcv::Image2D Network(larcv::Image2D Pred_img,larcv::SparseImage img_adcmasked,
   }
   // std::cout << pFunc<<std::endl;
 
+
   PyObject *pReturn = PyObject_CallFunctionObjArgs(pFunc,pArray,NULL);
+  clock_t returned = clock();
   // std::cout<<pReturn<<std::endl;
   PyArrayObject *np_ret = reinterpret_cast<PyArrayObject*>(pReturn);
 
@@ -56,6 +59,10 @@ larcv::Image2D Network(larcv::Image2D Pred_img,larcv::SparseImage img_adcmasked,
     if (*(c_out + 3*i + 2) >10){
       Pred_img.set_pixel(*(c_out + 3*i + 0),*(c_out + 3*i + 1),*(c_out + 3*i + 2));}
   }
+  clock_t predtime = clock();
+  // std::cout << "time to make array: " << float(parray - startloop)/CLOCKS_PER_SEC <<std::endl;
+  // std::cout << "time to forward pass: " << float(returned-parray)/CLOCKS_PER_SEC <<std::endl;
+  // std::cout << "time to set final: " << float(predtime-returned)/CLOCKS_PER_SEC <<std::endl;
 
   return Pred_img;
 }
@@ -180,7 +187,7 @@ int main(){
   std::cout<< "Time to finish crops: "<<float(crop-begin)/CLOCKS_PER_SEC<<std::endl;
 
   // Sparsify Image2D
-  std::vector<float> thresholds (1,0);
+  std::vector<float> thresholds (1,10);
   larcv::SparseImage sparse_img;
   larcv::EventSparseImage usparse_v;
   larcv::EventSparseImage vsparse_v;
@@ -205,7 +212,7 @@ int main(){
   std::vector<larcv::Image2D> y_out;
   for (int plane = 0;plane<3;plane++){
     if (plane == 0 ){
-      for (int i = 0; i< 3;i++){
+      for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img =  larcv::Image2D(img2d_list[0][i].meta());
         clock_t network1 = clock();
         Pred_img = Network(Pred_img,usparse_v.at(i),plane);
@@ -215,7 +222,7 @@ int main(){
       }
     }
     else if (plane == 1 ){
-      for (int i = 0; i< 3;i++){
+      for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img=  larcv::Image2D(img2d_list[1][i].meta());
         clock_t network1 = clock();
         Pred_img = Network(Pred_img,vsparse_v.at(i),plane);
@@ -225,7 +232,7 @@ int main(){
       }
     }
     else if (plane == 2 ){
-      for (int i = 0; i< 3;i++){
+      for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img=  larcv::Image2D(img2d_list[2][i].meta());
         clock_t network1 = clock();
         Pred_img = Network(Pred_img,ysparse_v.at(i),plane);
@@ -235,6 +242,7 @@ int main(){
       }
     }
   }
+  std::cout <<"finished network loop" <<std::endl;
 
   // create full images from crops
   clock_t startfull = clock();
@@ -258,22 +266,18 @@ int main(){
   larcv::ImageMeta output_y_meta=outputimg_y.meta();
   // std::cout<<wholeview_v.at(0).meta().min_x()<<" "<<wholeview_v.at(0).meta().max_x()<<" "<<wholeview_v.at(0).meta().min_y()<<" "<<wholeview_v.at(0).meta().max_y()<<std::endl;
 
-  for (int i =0; i<3;i++){
-    // std::cout<<"output meta: "<<std::endl;
-    // std::cout <<  u_out[i].meta().dump() <<std::endl;
-    // std::cout <<  v_out[i].meta().dump() <<std::endl;
-    // std::cout <<  y_out[i].meta().dump() <<std::endl;
+  for (int i =0; i<66;i++){
     ublarcvapp::InfillImageStitcher().Croploop(output_u_meta, u_out[i], outputimg_u,overlapcountimg_u);
     ublarcvapp::InfillImageStitcher().Croploop(output_v_meta, v_out[i], outputimg_v,overlapcountimg_v);
     ublarcvapp::InfillImageStitcher().Croploop(output_y_meta, y_out[i], outputimg_y,overlapcountimg_y);
   }
-  // std::cout << "Finished Crop loop"<<std::endl;
+  std::cout << "Finished Crop loop"<<std::endl;
 
   // creates overlay image and takes average where crops overlapped
   ublarcvapp::InfillImageStitcher().Overlayloop(0,output_u_meta,outputimg_u,overlapcountimg_u, wholeview_v, *ev_chstatus);
   ublarcvapp::InfillImageStitcher().Overlayloop(1,output_v_meta,outputimg_v,overlapcountimg_v, wholeview_v, *ev_chstatus);
   ublarcvapp::InfillImageStitcher().Overlayloop(2,output_y_meta,outputimg_y,overlapcountimg_y, wholeview_v, *ev_chstatus);
-  // std::cout << "Finished Overlay loop" <<std::endl;
+  std::cout << "Finished Overlay loop" <<std::endl;
 
   ev_infill->Append(outputimg_u);
   ev_infill->Append(outputimg_v);
