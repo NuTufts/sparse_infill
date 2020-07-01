@@ -1,6 +1,11 @@
 #include "sparse_full_deploy.h"
 #include "argparse.hpp"
 
+#include "TStyle.h"
+#include "TH2D.h"
+#include "TCanvas.h"
+#include "larcv/core/ROOTUtil/ROOTUtils.h"
+
 larcv::Image2D Network(larcv::Image2D Pred_img,
                        larcv::SparseImage img_adcmasked,
                        int plane,
@@ -92,6 +97,7 @@ int main( int argc, const char** argv ){
   Py_Initialize();
   import_array1(0);
 
+  gStyle->SetOptStat(0);
 
   // Argument parser
   /** taken from https://github.com/hbristow/argparse **/
@@ -115,24 +121,56 @@ int main( int argc, const char** argv ){
   
   larcv::IOManager *ioin = nullptr;
   if ( parser.exists("tick-backwards") ) {
-    ioin = new larcv::IOManager(larcv::IOManager::kREAD,"IOManager",larcv::IOManager::kTickBackward);
+    ioin = new larcv::IOManager(larcv::IOManager::kBOTH,"IOManager",larcv::IOManager::kTickBackward);
   }
   else {
-    ioin = new larcv::IOManager(larcv::IOManager::kREAD,"IOManager");
+    ioin = new larcv::IOManager(larcv::IOManager::kBOTH,"IOManager");
   }
   ioin->add_in_file( parser.retrieve<std::string>("input-larcv") ); // e.g. "supera-Run004955-SubRun000079.root"
   
   if ( parser.exists("tick-backwards") ) {
     ioin->reverse_all_products();
   }
+  ioin->set_out_file( parser.retrieve<std::string>("output") ); //e.g. sparseinfill_cxx_test.root
   //ioin->set_out_file("sparseinfill_cxx_test.root"); ///< this overwritten by output iomanager?
+
+
+  /**
+  KEY: TTree	image2d_wire_tree;1	wire tree
+  KEY: TTree	chstatus_wire_tree;1	wire tree
+  KEY: TTree	image2d_ubspurn_plane0_tree;1	ubspurn_plane0 tree
+  KEY: TTree	image2d_ubspurn_plane1_tree;1	ubspurn_plane1 tree
+  KEY: TTree	image2d_ubspurn_plane2_tree;1	ubspurn_plane2 tree
+  KEY: TTree	image2d_thrumu_tree;1	thrumu tree
+  KEY: TTree	image2d_segment_tree;1	segment tree
+  KEY: TTree	image2d_instance_tree;1	instance tree
+  KEY: TTree	image2d_ancestor_tree;1	ancestor tree
+  KEY: TTree	partroi_segment_tree;1	segment tree
+  KEY: TTree	image2d_larflow_tree;1	larflow tree
+  KEY: TTree	image2d_wcshower_tpc_tree;1	wcshower_tpc tree
+  KEY: TTree	image2d_wctrack_tpc_tree;1	wctrack_tpc tree    
+   */
+  ioin->specify_data_read( larcv::kProductImage2D,  "wire");
+  ioin->specify_data_read( larcv::kProductImage2D,  "ubspurn_plane0" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "ubspurn_plane1" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "ubspurn_plane2" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "thrumu" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "segment" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "instance" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "ancestor" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "larflow" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "wcshower_tpc" );
+  ioin->specify_data_read( larcv::kProductImage2D,  "wctrack_tpc" );      
+  ioin->specify_data_read( larcv::kProductROI,      "segment" );
+  ioin->specify_data_read( larcv::kProductChStatus, "wire");
+  
   ioin->initialize();
 
   // // output file
-  larcv::IOManager *foutIO = new larcv::IOManager( larcv::IOManager::kWRITE,"OutManager");
-  foutIO->set_out_file( parser.retrieve<std::string>("output") ); //e.g. sparseinfill_cxx_test.root
-  //foutIO->set_out_file( "sparseinfill_cxx_test.root" );
-  foutIO->initialize();
+  // larcv::IOManager *foutIO = new larcv::IOManager( larcv::IOManager::kWRITE,"OutManager");
+  // foutIO->set_out_file( parser.retrieve<std::string>("output") ); //e.g. sparseinfill_cxx_test.root
+  // //foutIO->set_out_file( "sparseinfill_cxx_test.root" );
+  // foutIO->initialize();
 
   int nentries = ioin->get_n_entries();
   if ( parser.exists("nentries") ) {
@@ -172,15 +210,15 @@ int main( int argc, const char** argv ){
     image_label_v = ublarcvapp::InfillDataCropper::ChStatusToLabels(image_label_v,ev_chstatus);
 
     // make output trees
-    larcv::EventImage2D* ev_infill  = (larcv::EventImage2D*)foutIO->get_data(larcv::kProductImage2D,"infill");
+    larcv::EventImage2D* ev_infill  = (larcv::EventImage2D*)ioin->get_data(larcv::kProductImage2D,"infill");
     ev_infill->clear();
-    larcv::EventImage2D* ev_input  = (larcv::EventImage2D*)foutIO->get_data(larcv::kProductImage2D,"wire");
-    ev_input->clear();
-    larcv::EventChStatus* evout_chstatus = (larcv::EventChStatus*)foutIO->get_data(larcv::kProductChStatus,"wire");
+    // larcv::EventImage2D* ev_input  = (larcv::EventImage2D*)foutIO->get_data(larcv::kProductImage2D,"wire");
+    // ev_input->clear();
+    // larcv::EventChStatus* evout_chstatus = (larcv::EventChStatus*)foutIO->get_data(larcv::kProductChStatus,"wire");
 
-    // copy chstatus
-    for ( int p=0; p<nplanes; p++ )
-      evout_chstatus->Insert( ev_chstatus->Status( (larcv::PlaneID_t)p ) );
+    // // copy chstatus
+    // for ( int p=0; p<nplanes; p++ )
+    //   evout_chstatus->Insert( ev_chstatus->Status( (larcv::PlaneID_t)p ) );
     
     
     // crop using UBSplit for infill network
@@ -335,6 +373,23 @@ int main( int argc, const char** argv ){
     ublarcvapp::InfillImageStitcher().Croploop(output_u_meta, u_out[i], outputimg_u,overlapcountimg_u);
     ublarcvapp::InfillImageStitcher().Croploop(output_v_meta, v_out[i], outputimg_v,overlapcountimg_v);
     ublarcvapp::InfillImageStitcher().Croploop(output_y_meta, y_out[i], outputimg_y,overlapcountimg_y);
+    TH2D hu_out = larcv::rootutils::as_th2d( u_out[i], "hout_u" );
+    TH2D hv_out = larcv::rootutils::as_th2d( v_out[i], "hout_v" );
+    TH2D hy_out = larcv::rootutils::as_th2d( y_out[i], "hout_y" );
+    TCanvas c("c","c",1500,500);
+    c.Divide(3,1);
+    c.cd(1);
+    hu_out.SetMaximum(120);
+    hu_out.Draw("colz");
+    c.cd(2);
+    hv_out.SetMaximum(120);
+    hv_out.Draw("colz");
+    c.cd(3);
+    hy_out.SetMaximum(120);
+    hy_out.Draw("colz");
+    char cname[256];
+    sprintf(cname,"infillout_event%d_crop%d.png",(int)n,i);
+    c.SaveAs(cname);
   }
   std::cout << "Finished Crop loop"<<std::endl;
 
@@ -348,20 +403,21 @@ int main( int argc, const char** argv ){
   ev_infill->Append(outputimg_v);
   ev_infill->Append(outputimg_y);
 
-  ev_input->Append(wholeview_v.at(0));
-  ev_input->Append(wholeview_v.at(1));
-  ev_input->Append(wholeview_v.at(2));
+  // ev_input->Append(wholeview_v.at(0));
+  // ev_input->Append(wholeview_v.at(1));
+  // ev_input->Append(wholeview_v.at(2));
 
   clock_t endfull = clock();
   std::cout<<"Time to finish stitching: "<<float(endfull-startfull)/CLOCKS_PER_SEC<<std::endl;
 
   // save to output file
-  foutIO->set_id( ev_meta->run(), ev_meta->subrun(), ev_meta->event() );
-  foutIO->save_entry();
+  //foutIO->set_id( ev_meta->run(), ev_meta->subrun(), ev_meta->event() );
+  //foutIO->save_entry();
+  ioin->save_entry();
   std::cout<<"finished entry: "<< n <<std::endl;
   }
 
-  foutIO->finalize();
+  //foutIO->finalize();
   ioin->finalize();
 
   Py_Finalize();
