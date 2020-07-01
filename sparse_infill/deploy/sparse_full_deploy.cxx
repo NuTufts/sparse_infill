@@ -176,6 +176,13 @@ int main( int argc, const char** argv ){
     ev_infill->clear();
     larcv::EventImage2D* ev_input  = (larcv::EventImage2D*)foutIO->get_data(larcv::kProductImage2D,"wire");
     ev_input->clear();
+    larcv::EventChStatus* evout_chstatus = (larcv::EventChStatus*)foutIO->get_data(larcv::kProductChStatus,"wire");
+
+    // copy chstatus
+    for ( int p=0; p<nplanes; p++ )
+      evout_chstatus->Insert( ev_chstatus->Status( (larcv::PlaneID_t)p ) );
+    
+    
     // crop using UBSplit for infill network
     // we want to break the image into set crops to send in
     // we split the entire image using UBSplitDetector
