@@ -27,3 +27,6 @@ all: $(EXEC)
 		$(CXX) $(CFLAGS) $(INCLUDES) -c $< -o $@.o
 		$(CXX) $(LDFLAGS) -o $@ $@.o $(LDLIBS) $(LIBS)
 		rm $@.o
+
+clean:
+	rm $(EXEC)

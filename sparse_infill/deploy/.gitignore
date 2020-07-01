@@ -1,5 +1,8 @@
+*~
 *.png
 *.txt
 *.root
 *.tar
 *.pyc
+sparse_full_deploy
+pytest
