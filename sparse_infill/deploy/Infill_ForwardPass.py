@@ -62,6 +62,7 @@ def forwardpassu(data_t, CHECKPOINT_FILE=None):
 
     
     model.load_state_dict(checkpoint["state_dict"])
+    model.eval()
     loadedmodeltime = time.time()
 
     # run the forward pass
@@ -116,6 +117,7 @@ def forwardpassv(data_t, CHECKPOINT_FILE=None):
             checkpoint["state_dict"][name] = arr.reshape( (arr.shape[0], 1, arr.shape[1], arr.shape[2]) )
     
     model.load_state_dict(checkpoint["state_dict"])
+    model.eval()    
     loadedmodeltime = time.time()
 
     # run the forward pass
@@ -167,6 +169,7 @@ def forwardpassy(data_t, CHECKPOINT_FILE=None):
             checkpoint["state_dict"][name] = arr.reshape( (arr.shape[0], 1, arr.shape[1], arr.shape[2]) )
     
     model.load_state_dict(checkpoint["state_dict"])
+    model.eval()    
     loadedmodeltime = time.time()
 
     # run the forward pass
