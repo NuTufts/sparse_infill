@@ -6,6 +6,8 @@
 #include "TCanvas.h"
 #include "larcv/core/ROOTUtil/ROOTUtils.h"
 
+#include "ublarcvapp/UBImageMod/EmptyChannelAlgo.h"
+
 larcv::Image2D Network(larcv::Image2D Pred_img,
                        larcv::SparseImage img_adcmasked,
                        int plane,
@@ -37,7 +39,7 @@ larcv::Image2D Network(larcv::Image2D Pred_img,
   PyObject *pModule = PyImport_Import(pName);  
   Py_DECREF(pName);
   if ( pModule==0 || pModule==NULL || pModule==nullptr ) {
-    throw std::runtime_error("Could not import Infill_ForwardPass");
+    throw std::runtime_error("Could not import Infill_ForwardPass. Did you run 'setenv.sh'?");
   }
 
   // choose which function depending on plane
@@ -108,19 +110,38 @@ int main( int argc, const char** argv ){
   parser.addArgument("-v","--v-weight",1,false);
   parser.addArgument("-y","--y-weight",1,false);
   parser.addArgument("-n","--nentries",1,true);
-  parser.addArgument("-t","--tick-backwards",0,true);
+  parser.addArgument("-t","--tick-backwards",1,true);
+  parser.addArgument("-d","--dump-images",1,true);
+  //parser.addArgument("-g","--gpu",1,true);
   parser.parse(argc, argv);
 
   std::cout << "Weight files loaded:" << std::endl;
   std::cout << " u:" << parser.retrieve<std::string>("u-weight") << std::endl;
   std::cout << " v:" << parser.retrieve<std::string>("v-weight") << std::endl;
-  std::cout << " y:" << parser.retrieve<std::string>("y-weight") << std::endl;  
+  std::cout << " y:" << parser.retrieve<std::string>("y-weight") << std::endl;
+
+  bool dump_images = false;
+  if ( parser.retrieve<std::string>("dump-images")=="1" )
+    dump_images = true;
+  else if ( parser.retrieve<std::string>("dump-images")!="0" && !parser.retrieve<std::string>("dump-images").empty() ) {
+    std::cout << "dump-images argument must be 0 or 1" << std::endl;
+    return 0;
+  }
+  
+  bool tick_backwards = false;
+  if ( parser.retrieve<std::string>("tick-backwards")=="1")
+    tick_backwards = true;
+  else if ( parser.retrieve<std::string>("tick-backwards")!="0" && !parser.retrieve<std::string>("tick-backwards").empty() ) {
+    std::cout << "tick-backwards argument must be 0 or 1"  << std::endl;
+    return 0;
+  }
+    
   
   clock_t begin = clock();
   // input IOManager
   
   larcv::IOManager *ioin = nullptr;
-  if ( parser.exists("tick-backwards") ) {
+  if ( tick_backwards ) {
     ioin = new larcv::IOManager(larcv::IOManager::kBOTH,"IOManager",larcv::IOManager::kTickBackward);
   }
   else {
@@ -128,7 +149,7 @@ int main( int argc, const char** argv ){
   }
   ioin->add_in_file( parser.retrieve<std::string>("input-larcv") ); // e.g. "supera-Run004955-SubRun000079.root"
   
-  if ( parser.exists("tick-backwards") ) {
+  if ( tick_backwards ) {
     ioin->reverse_all_products();
   }
   ioin->set_out_file( parser.retrieve<std::string>("output") ); //e.g. sparseinfill_cxx_test.root
@@ -173,11 +194,10 @@ int main( int argc, const char** argv ){
   // foutIO->initialize();
 
   int nentries = ioin->get_n_entries();
-  if ( parser.exists("nentries") ) {
-    int arg_nentries = (int)std::atoi(parser.retrieve<std::string>("nentries").c_str());
-    if ( arg_nentries<nentries )
-      nentries = arg_nentries;
-  }
+  int arg_nentries = (int)std::atoi(parser.retrieve<std::string>("nentries").c_str());
+  if ( arg_nentries>0 && arg_nentries<nentries )
+    nentries = arg_nentries;
+  std::cout << "Number of entries to run: " << nentries << std::endl;
 
   // loop through entries
   for (int n = 0; n<nentries;n++){
@@ -206,8 +226,20 @@ int main( int argc, const char** argv ){
     std::cout<<"Number of planes in entry " << run << ", " << subrun << ", " << event << ": "<<nplanes<<std::endl;
 
     // create labels_image_v
-    std::vector<larcv::Image2D> image_label_v = {wholeview_v[0].meta() , wholeview_v[1].meta() , wholeview_v[2].meta()};
-    image_label_v = ublarcvapp::InfillDataCropper::ChStatusToLabels(image_label_v,ev_chstatus);
+    // std::vector<larcv::Image2D> image_label_v = {wholeview_v[0].meta() , wholeview_v[1].meta() , wholeview_v[2].meta()};
+    // image_label_v = ublarcvapp::InfillDataCropper::ChStatusToLabels(image_label_v,ev_chstatus);
+
+    ublarcvapp::EmptyChannelAlgo badchmaker;
+    std::vector<larcv::Image2D> image_label_v = badchmaker.makeGapChannelImage( wholeview_v, *ev_chstatus, 4, 3, 2400, 6*1008, 3456, 6, 1, 10.0, 100, -1.0 );
+    for ( auto& img : image_label_v ) {
+      for (size_t r=0; r<img.meta().rows(); r++) {
+        for (size_t c=0; c<img.meta().cols(); c++) {
+          if ( img.pixel(r,c)>0,0 )
+            img.set_pixel(r,c,1.0);
+        }
+      }
+    }
+        
 
     // make output trees
     larcv::EventImage2D* ev_infill  = (larcv::EventImage2D*)ioin->get_data(larcv::kProductImage2D,"infill");
@@ -373,36 +405,64 @@ int main( int argc, const char** argv ){
     ublarcvapp::InfillImageStitcher().Croploop(output_u_meta, u_out[i], outputimg_u,overlapcountimg_u);
     ublarcvapp::InfillImageStitcher().Croploop(output_v_meta, v_out[i], outputimg_v,overlapcountimg_v);
     ublarcvapp::InfillImageStitcher().Croploop(output_y_meta, y_out[i], outputimg_y,overlapcountimg_y);
-    TH2D hu_out = larcv::rootutils::as_th2d( u_out[i], "hout_u" );
-    TH2D hv_out = larcv::rootutils::as_th2d( v_out[i], "hout_v" );
-    TH2D hy_out = larcv::rootutils::as_th2d( y_out[i], "hout_y" );
-    TCanvas c("c","c",1500,500);
-    c.Divide(3,1);
-    c.cd(1);
-    hu_out.SetMaximum(120);
-    hu_out.Draw("colz");
-    c.cd(2);
-    hv_out.SetMaximum(120);
-    hv_out.Draw("colz");
-    c.cd(3);
-    hy_out.SetMaximum(120);
-    hy_out.Draw("colz");
-    char cname[256];
-    sprintf(cname,"infillout_event%d_crop%d.png",(int)n,i);
-    c.SaveAs(cname);
+
+    if ( dump_images ) {
+      
+      TH2D hu_out = larcv::rootutils::as_th2d( u_out[i], "hout_u" );
+      TH2D hv_out = larcv::rootutils::as_th2d( v_out[i], "hout_v" );
+      TH2D hy_out = larcv::rootutils::as_th2d( y_out[i], "hout_y" );
+
+      //std::cout << "vsparse_v[" << i << "].len(): " << (int)vsparse_v.at(i).len()  << std::endl;
+      std::vector< larcv::EventSparseImage* > sparse_container_v
+        = { &usparse_v, &vsparse_v, &ysparse_v };
+      std::vector< TH2D* > h_v = { &hu_out, &hv_out, &hy_out };
+      
+      for (int p=0; p<3; p++ ) {
+        larcv::EventSparseImage& sparse_v = *sparse_container_v[p];
+        TH2D& hout = *h_v[p];
+        for ( int ipix=0; ipix<(int)sparse_v.at(i).len(); ipix++ ) {
+          int row = (int)sparse_v.at(i).getfeature( ipix, 0 );
+          int col = (int)sparse_v.at(i).getfeature( ipix, 1 );
+          float val = sparse_v.at(i).getfeature(ipix,2);
+          if ( hout.GetBinContent( col+1, row+1 )==0 )
+            hout.SetBinContent( col+1, row+1, 5.0 );
+        }
+      }
+      
+      TCanvas c("c","c",1500,500);
+      c.Divide(3,1);
+      c.cd(1);
+      hu_out.SetMaximum(120);
+      hu_out.Draw("colz");
+      c.cd(2);
+      hv_out.SetMaximum(120);
+      hv_out.Draw("colz");
+      c.cd(3);
+      hy_out.SetMaximum(120);
+      hy_out.Draw("colz");
+      char cname[256];
+      sprintf(cname,"infillout_event%d_crop%d.png",(int)n,i);
+      c.SaveAs(cname);
+    }//end of if dump images
   }
   std::cout << "Finished Crop loop"<<std::endl;
 
   // creates overlay image and takes average where crops overlapped
-  ublarcvapp::InfillImageStitcher().Overlayloop(0,output_u_meta,outputimg_u,overlapcountimg_u, wholeview_v, *ev_chstatus);
-  ublarcvapp::InfillImageStitcher().Overlayloop(1,output_v_meta,outputimg_v,overlapcountimg_v, wholeview_v, *ev_chstatus);
-  ublarcvapp::InfillImageStitcher().Overlayloop(2,output_y_meta,outputimg_y,overlapcountimg_y, wholeview_v, *ev_chstatus);
+  ublarcvapp::InfillImageStitcher().Overlayloop(0,output_u_meta,outputimg_u,overlapcountimg_u, wholeview_v, image_label_v);
+  ublarcvapp::InfillImageStitcher().Overlayloop(1,output_v_meta,outputimg_v,overlapcountimg_v, wholeview_v, image_label_v);
+  ublarcvapp::InfillImageStitcher().Overlayloop(2,output_y_meta,outputimg_y,overlapcountimg_y, wholeview_v, image_label_v);
+  // ublarcvapp::InfillImageStitcher().Overlayloop(0,output_u_meta,outputimg_u,overlapcountimg_u, wholeview_v, *ev_chstatus);
+  // ublarcvapp::InfillImageStitcher().Overlayloop(1,output_v_meta,outputimg_v,overlapcountimg_v, wholeview_v, *ev_chstatus);
+  // ublarcvapp::InfillImageStitcher().Overlayloop(2,output_y_meta,outputimg_y,overlapcountimg_y, wholeview_v, *ev_chstatus);
   std::cout << "Finished Overlay loop" <<std::endl;
 
   ev_infill->Append(outputimg_u);
   ev_infill->Append(outputimg_v);
   ev_infill->Append(outputimg_y);
 
+  // save bad ch image
+  larcv::EventImage2D* ev_badchimg = (larcv::EventImage2D*)ioin->get_data(larcv::kProductImage2D,"badchimg");
+  ev_badchimg->Emplace( std::move(image_label_v) );
   // ev_input->Append(wholeview_v.at(0));
   // ev_input->Append(wholeview_v.at(1));
   // ev_input->Append(wholeview_v.at(2));

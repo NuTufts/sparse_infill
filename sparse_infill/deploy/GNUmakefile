@@ -7,6 +7,7 @@ INCLUDES = `root-config --incdir`
 INCLUDES += `/usr/bin/python2.7-config --includes`
 INCLUDES += `larcv-config --includes`
 INCLUDES += `larlite-config --includes`
+INCLUDES += -I$(LARLITE_BASEDIR)/../
 INCLUDES += `ublarcvapp-config --includes`
 
 LIBS = `root-config --libs`

@@ -22,6 +22,7 @@ from sparseinfill import SparseInfill
 
 def forwardpassu(data_t, CHECKPOINT_FILE=None):
 
+    DEVICE="cpu"
     
     # function to load the sparse infill network and run a forward pass of one image
     # make tensor for coords (row,col,batch)
@@ -34,23 +35,24 @@ def forwardpassu(data_t, CHECKPOINT_FILE=None):
     if (isdeadnum == 0):
         print("SKIPPED DUE TO NO DEAD CHANNELS")
         return data_t
-    coord_t = torch.ones( (ncoords,3), dtype=torch.int )
+    coord_t = torch.ones( (ncoords,3), dtype=torch.int ).to(torch.device(DEVICE))
     # tensor for input pixels
-    input_t = torch.zeros( (ncoords,1), dtype=torch.float)
+    input_t = torch.zeros( (ncoords,1), dtype=torch.float).to(torch.device(DEVICE))
 
     coord_t[0:ncoords,0:2] \
-        = torch.from_numpy(data_t[:,0:2].astype(np.int) )
-    input_t[0:ncoords,0]  = torch.from_numpy(data_t[:,2])
-
+        = torch.from_numpy(data_t[:,0:2].astype(np.int) ).to(torch.device(DEVICE))
+    input_t[0:ncoords,0]  = torch.from_numpy(data_t[:,2]).to(torch.device(DEVICE))
+    #print("shape: ",coord_t.shape)
 
     # loading model with hard coded parameters used in training
     # ( (height,width),reps,ninput_features, noutput_features,nplanes, show_sizes=False)
     if CHECKPOINT_FILE is None:
         CHECKPOINT_FILE = "/mnt/disk1/nutufts/kmason/sparsenet/ubdl/sparse_infill/sparse_infill/training/sparseinfill_uplane_test.tar"
-    model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False)
+    model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False).to(torch.device(DEVICE))
 
     # load checkpoint data
-    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
+    #checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":"cpu","cuda:1":"cpu"} )
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":DEVICE,"cuda:1":DEVICE} )
 
     for name,arr in checkpoint["state_dict"].items():
         if ( ("unet" in name and "weight" in name and len(arr.shape)==3) or
@@ -68,9 +70,10 @@ def forwardpassu(data_t, CHECKPOINT_FILE=None):
     # run the forward pass
     with torch.set_grad_enabled(False):
         out_t = model(coord_t, input_t, 1)
+        print("out_t: ",out_t.shape)
     forwardpasstime = time.time()
-    out_t = out_t.data.numpy()
-    input_t = input_t.data.numpy()
+    out_t = out_t.cpu().numpy()
+    input_t = input_t.cpu().numpy()
     predict_t = np.zeros( (ncoords,3), dtype=np.float32)
     predict_t[:,2]   = out_t[:,0]
     predict_t[:,0:2] = data_t[:,0:2]
