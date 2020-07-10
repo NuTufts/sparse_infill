@@ -8,10 +8,99 @@
 
 #include "ublarcvapp/UBImageMod/EmptyChannelAlgo.h"
 
-larcv::Image2D Network(larcv::Image2D Pred_img,
-                       larcv::SparseImage img_adcmasked,
-                       int plane,
-                       std::string weightfile ){
+// larcv::Image2D Network(larcv::Image2D Pred_img,
+//                        larcv::SparseImage img_adcmasked,
+//                        int plane,
+//                        std::string weightfile ){
+//   // std::cout << "In network loop" <<std::endl;
+//   // Convert array into numpy array
+//   int ND = img_adcmasked.pixellist().size();
+//   // std::cout <<ND <<std::endl;
+//   clock_t startloop = clock();
+
+//   float npts    = ND/3;
+//   float c_arr[int(npts)][3];
+//   for (int start = 0; start <int(npts); start++){
+//     c_arr[start][0] = img_adcmasked.pixellist()[start*3];
+//     c_arr[start][1] = img_adcmasked.pixellist()[start*3+1];
+//     c_arr[start][2] = img_adcmasked.pixellist()[start*3+2];
+//   }
+
+
+//   npy_intp dims[2]{int(npts),3};
+//   // std::cout <<*c_arr<<std::endl;
+
+//   PyObject *pArray = PyArray_SimpleNewFromData(2,dims,NPY_FLOAT,reinterpret_cast<void*>(c_arr));
+//   // std::cout<<pArray<<std::endl;
+//   clock_t parray = clock();
+//   // import forward pass python module
+//   PyObject *pName   = PyUnicode_FromString("Infill_ForwardPass");
+//   PyObject *pWeight = PyUnicode_FromString(weightfile.c_str());
+//   PyObject *pModule = PyImport_Import(pName);  
+//   Py_DECREF(pName);
+//   if ( pModule==0 || pModule==NULL || pModule==nullptr ) {
+//     throw std::runtime_error("Could not import Infill_ForwardPass. Did you run 'setenv.sh'?");
+//   }
+
+//   // choose which function depending on plane
+//   PyObject *pFunc = nullptr;
+//   if (plane == 0){
+//     try {
+//       pFunc = PyObject_GetAttrString(pModule,"forwardpassu");
+//     }
+//     catch ( const std::exception& e ) {
+//       std::cout << "ERROR LOADING FUNCTION 'forwardpassu' FROM MODULE" << std::endl;
+//       std::cout << e.what() << std::endl;
+//       throw e;
+//     }
+//   }
+//   else if (plane == 1){
+//     pFunc = PyObject_GetAttrString(pModule,"forwardpassv");
+//   }
+//   else{
+//     pFunc = PyObject_GetAttrString(pModule,"forwardpassy");
+//   }
+//   if ( !pFunc ) {
+//     throw std::runtime_error("ERROR loading forward pass function");
+//   }
+//   std::cout << "forward pass module: " << pFunc <<std::endl;  
+  
+
+
+//   PyObject *pReturn = PyObject_CallFunctionObjArgs(pFunc,pArray,pWeight,NULL);
+//   if ( !pReturn ) {
+//     throw std::runtime_error("ERROR in return array from forwardpass. Is NULL");
+//   }
+//   clock_t returned = clock();
+//   // std::cout<<pReturn<<std::endl;
+//   PyArrayObject *np_ret = reinterpret_cast<PyArrayObject*>(pReturn);
+
+
+//   // converting back to c++ array
+//   float *c_out;
+//   c_out = reinterpret_cast<float*>(PyArray_DATA(np_ret));
+
+
+//   // save to output_img
+//   for (int i =0; i<int(npts);i++){
+//     // setting threshold at 10
+//     if (*(c_out + 3*i + 2) >10){
+//       Pred_img.set_pixel(*(c_out + 3*i + 0),*(c_out + 3*i + 1),*(c_out + 3*i + 2));}
+//   }
+//   clock_t predtime = clock();
+//   // std::cout << "time to make array: " << float(parray - startloop)/CLOCKS_PER_SEC <<std::endl;
+//   // std::cout << "time to forward pass: " << float(returned-parray)/CLOCKS_PER_SEC <<std::endl;
+//   // std::cout << "time to set final: " << float(predtime-returned)/CLOCKS_PER_SEC <<std::endl;
+
+//   return Pred_img;
+// }
+
+void RunNetwork( PyObject* pForwardFunc,
+                 PyObject* pModel,
+                 larcv::SparseImage img_adcmasked,
+                 larcv::Image2D& Pred_img,
+                 std::string devname )
+{
   // std::cout << "In network loop" <<std::endl;
   // Convert array into numpy array
   int ND = img_adcmasked.pixellist().size();
@@ -26,48 +115,22 @@ larcv::Image2D Network(larcv::Image2D Pred_img,
     c_arr[start][2] = img_adcmasked.pixellist()[start*3+2];
   }
 
-
   npy_intp dims[2]{int(npts),3};
   // std::cout <<*c_arr<<std::endl;
 
+  PyObject* pDEVNAME = PyUnicode_FromString(devname.c_str());
   PyObject *pArray = PyArray_SimpleNewFromData(2,dims,NPY_FLOAT,reinterpret_cast<void*>(c_arr));
   // std::cout<<pArray<<std::endl;
   clock_t parray = clock();
   // import forward pass python module
-  PyObject *pName   = PyUnicode_FromString("Infill_ForwardPass");
-  PyObject *pWeight = PyUnicode_FromString(weightfile.c_str());
-  PyObject *pModule = PyImport_Import(pName);  
-  Py_DECREF(pName);
-  if ( pModule==0 || pModule==NULL || pModule==nullptr ) {
-    throw std::runtime_error("Could not import Infill_ForwardPass. Did you run 'setenv.sh'?");
-  }
-
-  // choose which function depending on plane
-  PyObject *pFunc = nullptr;
-  if (plane == 0){
-    try {
-      pFunc = PyObject_GetAttrString(pModule,"forwardpassu");
-    }
-    catch ( const std::exception& e ) {
-      std::cout << "ERROR LOADING FUNCTION 'forwardpassu' FROM MODULE" << std::endl;
-      std::cout << e.what() << std::endl;
-      throw e;
-    }
-  }
-  else if (plane == 1){
-    pFunc = PyObject_GetAttrString(pModule,"forwardpassv");
-  }
-  else{
-    pFunc = PyObject_GetAttrString(pModule,"forwardpassy");
-  }
-  if ( !pFunc ) {
-    throw std::runtime_error("ERROR loading forward pass function");
-  }
-  std::cout << "forward pass module: " << pFunc <<std::endl;  
   
-
-
-  PyObject *pReturn = PyObject_CallFunctionObjArgs(pFunc,pArray,pWeight,NULL);
+  PyObject *pReturn = PyObject_CallFunctionObjArgs(pForwardFunc,pModel,pArray,pDEVNAME,NULL);
+  PyObject* perr = PyErr_Occurred();
+  if ( perr ) {
+    PyErr_Print();
+    throw std::runtime_error("ERROR running forwardpass_all function");
+  }
+  
   if ( !pReturn ) {
     throw std::runtime_error("ERROR in return array from forwardpass. Is NULL");
   }
@@ -75,11 +138,9 @@ larcv::Image2D Network(larcv::Image2D Pred_img,
   // std::cout<<pReturn<<std::endl;
   PyArrayObject *np_ret = reinterpret_cast<PyArrayObject*>(pReturn);
 
-
   // converting back to c++ array
   float *c_out;
   c_out = reinterpret_cast<float*>(PyArray_DATA(np_ret));
-
 
   // save to output_img
   for (int i =0; i<int(npts);i++){
@@ -92,10 +153,14 @@ larcv::Image2D Network(larcv::Image2D Pred_img,
   // std::cout << "time to forward pass: " << float(returned-parray)/CLOCKS_PER_SEC <<std::endl;
   // std::cout << "time to set final: " << float(predtime-returned)/CLOCKS_PER_SEC <<std::endl;
 
-  return Pred_img;
+  Py_DECREF( pDEVNAME );
+  Py_DECREF( pArray );
+  Py_DECREF( pReturn );
+
 }
 
 int main( int argc, const char** argv ){
+
   Py_Initialize();
   import_array1(0);
 
@@ -112,13 +177,14 @@ int main( int argc, const char** argv ){
   parser.addArgument("-n","--nentries",1,true);
   parser.addArgument("-t","--tick-backwards",1,true);
   parser.addArgument("-d","--dump-images",1,true);
-  //parser.addArgument("-g","--gpu",1,true);
+  parser.addArgument("-g","--gpu-name",1,true);
   parser.parse(argc, argv);
 
   std::cout << "Weight files loaded:" << std::endl;
   std::cout << " u:" << parser.retrieve<std::string>("u-weight") << std::endl;
   std::cout << " v:" << parser.retrieve<std::string>("v-weight") << std::endl;
   std::cout << " y:" << parser.retrieve<std::string>("y-weight") << std::endl;
+
 
   bool dump_images = false;
   if ( parser.retrieve<std::string>("dump-images")=="1" )
@@ -136,6 +202,10 @@ int main( int argc, const char** argv ){
     return 0;
   }
     
+  std::string device_name  = "cpu";
+  if ( !parser.retrieve<std::string>("gpu-name").empty() ) {
+    device_name = parser.retrieve<std::string>("gpu-name");
+  }
   
   clock_t begin = clock();
   // input IOManager
@@ -198,6 +268,34 @@ int main( int argc, const char** argv ){
   if ( arg_nentries>0 && arg_nentries<nentries )
     nentries = arg_nentries;
   std::cout << "Number of entries to run: " << nentries << std::endl;
+
+  // ------------------------------------------------------------
+  // LOAD NETWORK
+  // load module
+  PyObject *pName   = PyUnicode_FromString("Infill_ForwardPass");
+  PyObject *pModule = PyImport_Import(pName);  
+  if ( pModule==0 || pModule==NULL || pModule==nullptr ) {
+    throw std::runtime_error("Could not import Infill_ForwardPass. Did you run 'setenv.sh'?");
+  }
+  //Py_DECREF(pName);  
+
+  // load network
+  std::string u_weightfile = parser.retrieve<std::string>("u-weight");
+  std::string v_weightfile = parser.retrieve<std::string>("v-weight");
+  std::string y_weightfile = parser.retrieve<std::string>("y-weight");
+  PyObject *pWeight_u = PyUnicode_FromString( u_weightfile.c_str() );
+  PyObject *pWeight_v = PyUnicode_FromString( v_weightfile.c_str() );
+  PyObject *pWeight_y = PyUnicode_FromString( y_weightfile.c_str() );
+  PyObject* pDevName  = PyUnicode_FromString( device_name.c_str() );
+  PyObject* pFunc_load_model  = PyObject_GetAttrString(pModule,"load_model");
+  PyObject* pFunc_forwardpass = PyObject_GetAttrString(pModule,"forwardpass_all");
+
+  PyObject *pModel_u = PyObject_CallFunctionObjArgs(pFunc_load_model,pWeight_u,pDevName,NULL);
+  PyObject *pModel_v = PyObject_CallFunctionObjArgs(pFunc_load_model,pWeight_v,pDevName,NULL);
+  PyObject *pModel_y = PyObject_CallFunctionObjArgs(pFunc_load_model,pWeight_y,pDevName,NULL);
+
+  std::cout << "Models loaded. [ENTER] to continue." << std::endl;
+  std::cin.get();
 
   // loop through entries
   for (int n = 0; n<nentries;n++){
@@ -345,35 +443,45 @@ int main( int argc, const char** argv ){
   std::vector<larcv::Image2D> u_out;
   std::vector<larcv::Image2D> v_out;
   std::vector<larcv::Image2D> y_out;
+  u_out.reserve(66);
+  v_out.reserve(66);
+  y_out.reserve(66);
+
   for (int plane = 0;plane<3;plane++){
     if (plane == 0 ){
       for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img =  larcv::Image2D(img2d_list[0][i].meta());
-        clock_t network1 = clock();
-        Pred_img = Network(Pred_img,usparse_v.at(i),plane,parser.retrieve<std::string>("u-weight"));
-        clock_t network2 = clock();
-        std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
-        u_out.push_back(Pred_img);
+        //clock_t network1 = clock();
+        std::cout << "Running plane[0] img[" << i  << "]" << std::endl;
+        //Pred_img = Network(Pred_img,usparse_v.at(i),plane,parser.retrieve<std::string>("u-weight"));
+        RunNetwork( pFunc_forwardpass, pModel_u, usparse_v.at(i), Pred_img, device_name );
+        //clock_t network2 = clock();
+        //std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
+        u_out.emplace_back( std::move(Pred_img) );
       }
     }
     else if (plane == 1 ){
       for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img=  larcv::Image2D(img2d_list[1][i].meta());
-        clock_t network1 = clock();
-        Pred_img = Network(Pred_img,vsparse_v.at(i),plane,parser.retrieve<std::string>("v-weight"));
-        clock_t network2 = clock();
-        std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
-        v_out.push_back(Pred_img);
+        std::cout << "Running plane[1] img[" << i  << "]" << std::endl;        
+        //clock_t network1 = clock();
+        //Pred_img = Network(Pred_img,vsparse_v.at(i),plane,parser.retrieve<std::string>("v-weight"));
+        RunNetwork( pFunc_forwardpass, pModel_v, vsparse_v.at(i), Pred_img, device_name );
+        //clock_t network2 = clock();
+        //std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
+        v_out.emplace_back( std::move(Pred_img) );
       }
     }
     else if (plane == 2 ){
       for (int i = 0; i< 66;i++){
         larcv::Image2D Pred_img=  larcv::Image2D(img2d_list[2][i].meta());
-        clock_t network1 = clock();
-        Pred_img = Network(Pred_img,ysparse_v.at(i),plane,parser.retrieve<std::string>("y-weight"));
-        clock_t network2 = clock();
-        std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
-        y_out.push_back(Pred_img);
+        std::cout << "Running plane[2] img[" << i  << "]" << std::endl;                
+        //clock_t network1 = clock();
+        //Pred_img = Network(Pred_img,ysparse_v.at(i),plane,parser.retrieve<std::string>("y-weight"));
+        RunNetwork( pFunc_forwardpass, pModel_y, ysparse_v.at(i), Pred_img, device_name );
+        //clock_t network2 = clock();
+        //std::cout<< "Time for crop ("<<i<<"): "<<float(network2-network1)/CLOCKS_PER_SEC<<std::endl;
+        y_out.emplace_back( std::move(Pred_img) );
       }
     }
   }

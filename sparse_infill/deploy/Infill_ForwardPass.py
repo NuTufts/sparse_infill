@@ -20,6 +20,23 @@ from larcv import larcv
 # must be in python path
 from sparseinfill import SparseInfill    
 
+def load_model( CHECKPOINT_FILE, DEVICE ):
+    model = SparseInfill( (512,496), 1,16,16,5, show_sizes=False).to(torch.device(DEVICE))
+
+    checkpoint = torch.load( CHECKPOINT_FILE, {"cuda:0":DEVICE,"cuda:1":DEVICE} )
+    for name,arr in checkpoint["state_dict"].items():
+        if ( ("unet" in name and "weight" in name and len(arr.shape)==3) or
+             ("conv2" in name and "weight" in name and len(arr.shape)==3) or
+             ("conv1" in name and "weight" in name and len(arr.shape)==3) or
+             ("sparseModel" in name and "weight" in name and len(arr.shape)==3) ):
+            #print("reshaping ",name)
+            checkpoint["state_dict"][name] = arr.reshape( (arr.shape[0], 1, arr.shape[1], arr.shape[2]) )
+    
+    model.load_state_dict(checkpoint["state_dict"])
+    model.eval()
+    #print(model)
+    return model
+
 def forwardpassu(data_t, CHECKPOINT_FILE=None):
 
     DEVICE="cpu"
@@ -188,7 +205,51 @@ def forwardpassy(data_t, CHECKPOINT_FILE=None):
     return predict_t
 
 
+def forwardpass_all(model, data_t, DEVICE):
+
+    # function to load the sparse infill network and run a forward pass of one image
+    # make tensor for coords (row,col,batch)
+    # print "forward pass"
+    starttime = time.time()
+    ncoords = np.size(data_t,0)    
+    isdead = np.equal(data_t,np.zeros((ncoords,3)))
+    isdeadnum = np.sum(isdead)
+    predict_t = np.zeros( (ncoords,3), dtype=np.float32)    
+    # print isdeadnum
+    if (isdeadnum == 0):
+        print("SKIPPED DUE TO NO DEAD CHANNELS")
+        predict_t[:,0:2] = data_t[:,0:2]        
+        return predict_t
+    coord_t = torch.zeros( (ncoords,3), dtype=torch.int ).to(torch.device(DEVICE))
+    # tensor for input pixels
+    input_t = torch.zeros( (ncoords,1), dtype=torch.float).to(torch.device(DEVICE))
+
+    coord_t[0:ncoords,0:2] \
+        = torch.from_numpy(data_t[:,0:2].astype(np.int) ).to(torch.device(DEVICE))
+    input_t[0:ncoords,0]  = torch.from_numpy(data_t[:,2]).to(torch.device(DEVICE))
+    #print("shape: ",coord_t.shape)
+
+    model.eval()
+
+    # run the forward pass
+    with torch.set_grad_enabled(False):
+        out_t = model(coord_t, input_t, 1)
+        #print("out_t: ",out_t.shape)
+    out_t = out_t.cpu().numpy()
+    forwardpasstime = time.time()    
+    predict_t = np.zeros( (ncoords,3), dtype=np.float32)
+    predict_t[:,2]   = out_t[:,0]
+    predict_t[:,0:2] = data_t[:,0:2]
+    # print "loadtime: ",loadedmodeltime-starttime
+    print("forwardpass: ", forwardpasstime-starttime," sec. out_t.shape=",out_t.shape)
+    # print "resizetime: ", resizetime-forwardpasstime
+
+    return predict_t
+
 if __name__ == "__main__":
 
+    DEV = "cpu"
+    model = load_model( "../weights/prelim_june2019/sparseinfill_uplane_test.tar", DEV )
     test = np.zeros( (100, 3 ) )
-    forwardpassu( test, "../weights/prelim_june2019/sparseinfill_uplane_test.tar" )
+    out = forwardpass_all( model, test, DEV )
+    print(out.shape)
